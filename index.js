@@ -33,7 +33,7 @@ const client = new MongoClient(uri, {
     try {
 
         const postsCollection = client.db('volunteerDB').collection('posts')
-        const bidsCollection = client.db('volunteerDB').collection('applied')
+        const appliedCollection = client.db('volunteerDB').collection('applied')
 
         // jwt generate
     app.post('/jwt', async (req, res) => {
@@ -75,6 +75,36 @@ const client = new MongoClient(uri, {
         const id = req.params.id
         const query = { _id: new ObjectId(id) }
         const result = await postsCollection.findOne(query)
+        res.send(result)
+      })
+
+
+      // Save a applied data in db
+    app.post('/applied', async (req, res) => {
+        const appliedData = req.body
+  
+        // check if its a duplicate request
+        const query = {
+          email: appliedData.email,
+          postId: appliedData.postId,
+        }
+        const alreadyApplied = await appliedCollection.findOne(query)
+        console.log(alreadyApplied)
+        if (alreadyApplied) {
+          return res
+            .status(400)
+            .send('You have already Volunteered for this post.')
+        }
+        //console.log(appliedData.postId,"postId")
+        const result = await appliedCollection.insertOne(appliedData)
+  
+        // update volunteer count in posts collection
+        const updateDoc = {
+          $inc: { No_of_volunteers_needed: -1 },
+        }
+        const jobQuery = { _id: new ObjectId(appliedData.postId) }
+        const updateVolCount = await postsCollection.updateOne(jobQuery, updateDoc)
+        console.log(updateVolCount,"Update")
         res.send(result)
       })
     
