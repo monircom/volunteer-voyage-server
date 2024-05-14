@@ -1,7 +1,7 @@
 const express = require('express')
 const cors = require('cors')
-//const jwt = require('jsonwebtoken')
-//const cookieParser = require('cookie-parser')
+const jwt = require('jsonwebtoken')
+const cookieParser = require('cookie-parser')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 require('dotenv').config()
 const port = process.env.PORT || 9000
@@ -11,8 +11,7 @@ const corsOptions = {
   origin: [
     'http://localhost:5173',
     'http://localhost:5174',
-    'https://volunteer-voyage.web.app',
-    'https://volunteer-voyage.firebaseapp.com',
+    'https://volunteer-voyage.web.app',    
   ],
   credentials: true,
   optionSuccessStatus: 200,
@@ -32,9 +31,40 @@ const client = new MongoClient(uri, {
   });
   async function run() {
     try {
+
+        const postsCollection = client.db('volunteerDB').collection('posts')
+        const bidsCollection = client.db('volunteerDB').collection('applied')
+
+        // jwt generate
+    app.post('/jwt', async (req, res) => {
+        const email = req.body
+        const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
+          expiresIn: '365d',
+        })
+        res
+          .cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+          })
+          .send({ success: true })
+      })
+  
+      // Clear token on logout
+      app.get('/logout', (req, res) => {
+        res
+          .clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            maxAge: 0,
+          })
+          .send({ success: true })
+      })
+
       // Connect the client to the server	(optional starting in v4.7)     
       // Send a ping to confirm a successful connection
-      await client.db("admin").command({ ping: 1 });
+      //await client.db("admin").command({ ping: 1 });
       console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
       // Ensures that the client will close when you finish/error
