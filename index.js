@@ -18,7 +18,7 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 app.use(express.json())
-//app.use(cookieParser())
+app.use(cookieParser())
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.bkwszd0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -61,6 +61,24 @@ const client = new MongoClient(uri, {
           })
           .send({ success: true })
       })
+
+    // Get all post data from db
+        app.get('/posts', async (req, res) => {
+        const result = await postsCollection.find().toArray()
+  
+        res.send(result)
+      })
+
+
+       // Get a single post data from db using post id
+       app.get('/post/:id', async (req, res) => {
+        const id = req.params.id
+        const query = { _id: new ObjectId(id) }
+        const result = await postsCollection.findOne(query)
+        res.send(result)
+      })
+    
+
 
       // Connect the client to the server	(optional starting in v4.7)     
       // Send a ping to confirm a successful connection
