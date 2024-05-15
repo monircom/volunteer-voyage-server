@@ -20,6 +20,27 @@ app.use(cors(corsOptions))
 app.use(express.json())
 app.use(cookieParser())
 
+
+
+// verify jwt middleware
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token
+  if (!token) return res.status(401).send({ message: 'unauthorized access' })
+  if (token) {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      if (err) {
+        console.log(err)
+        return res.status(401).send({ message: 'unauthorized access' })
+      }
+      console.log(decoded)
+
+      req.user = decoded
+      next()
+    })
+  }
+}
+
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.bkwszd0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const client = new MongoClient(uri, {
@@ -52,6 +73,7 @@ const client = new MongoClient(uri, {
   
       // Clear token on logout
       app.get('/logout', (req, res) => {
+        console.log("token delete");
         res
           .clearCookie('token', {
             httpOnly: true,
@@ -78,6 +100,60 @@ const client = new MongoClient(uri, {
         res.send(result)
       })
 
+        // Save a post data in db
+        app.post('/post', async (req, res) => {
+          const postData = req.body
+    
+          const result = await postsCollection.insertOne(postData)
+          res.send(result)
+        })
+
+    // get all posts posted by a specific user
+    app.get('/posts/:email', verifyToken,  async (req, res) => {
+      const tokenEmail = req.user.email
+      const email = req.params.email
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      const query = { 'organizer_email': email }
+      const result = await postsCollection.find(query).toArray()
+      res.send(result)
+    })
+
+        // get all applied posts by a specific user
+        app.get('/applied/:email', verifyToken,  async (req, res) => {
+          const tokenEmail = req.user.email
+          const email = req.params.email
+          if (tokenEmail !== email) {
+            return res.status(403).send({ message: 'forbidden access' })
+          }
+          const query = { 'email': email }
+          const result = await appliedCollection.find(query).toArray()
+          res.send(result)
+        })
+
+    
+    // update a post in db
+    app.put('/post/:id', async (req, res) => {
+      const id = req.params.id
+      const postData = req.body
+      const query = { _id: new ObjectId(id) }
+      const options = { upsert: true }
+      const updateDoc = {
+        $set: {
+          ...postData,
+        },
+      }
+      const result = await postsCollection.updateOne(query, updateDoc, options)
+      res.send(result)
+    })
+   // delete a job data from db
+   app.delete('/post/:id', async (req, res) => {
+    const id = req.params.id
+    const query = { _id: new ObjectId(id) }
+    const result = await postsCollection.deleteOne(query)
+    res.send(result)
+  })
 
       // Save a applied data in db
     app.post('/applied', async (req, res) => {
@@ -100,7 +176,7 @@ const client = new MongoClient(uri, {
   
         // update volunteer count in posts collection
         const updateDoc = {
-          $inc: { No_of_volunteers_needed: -1 },
+          $inc: { no_of_volunteers_needed: -1 },
         }
         const jobQuery = { _id: new ObjectId(appliedData.postId) }
         const updateVolCount = await postsCollection.updateOne(jobQuery, updateDoc)
